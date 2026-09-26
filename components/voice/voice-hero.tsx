@@ -3,17 +3,17 @@
 import { type FormEvent, useState } from "react";
 import { copy, type Locale } from "@/lib/i18n/content";
 import { openSection, sectionIds } from "@/lib/elevenlabs/open-section";
-import { useVoiceAgent } from "@/lib/elevenlabs/use-voice-agent";
+import type { VoiceAgentController } from "@/lib/elevenlabs/use-voice-agent";
 import { VoiceOrb } from "./voice-orb";
 
 type VoiceHeroProps = {
   locale: Locale;
   onLocaleChange: (locale: Locale) => void;
+  agent: VoiceAgentController;
 };
 
-export function VoiceHero({ locale, onLocaleChange }: VoiceHeroProps) {
+export function VoiceHero({ locale, onLocaleChange, agent }: VoiceHeroProps) {
   const t = copy[locale];
-  const agent = useVoiceAgent(locale);
   const [text, setText] = useState("");
 
   function submit(event: FormEvent) {
@@ -28,7 +28,7 @@ export function VoiceHero({ locale, onLocaleChange }: VoiceHeroProps) {
           {t.name}
         </a>
         <nav className="section-nav" aria-label={locale === "zh" ? "主要内容" : "Main sections"}>
-          {(["product", "research", "interests", "projects"] as const).map((section) => (
+          {(["product", "technical", "research", "interests", "projects"] as const).map((section) => (
             <button type="button" key={section} onClick={() => openSection(section)}>
               {t.nav[section]}
             </button>
@@ -55,6 +55,11 @@ export function VoiceHero({ locale, onLocaleChange }: VoiceHeroProps) {
 
         <div className="voice-console">
           <VoiceOrb state={agent.uiState} label={t.statuses[agent.uiState]} />
+          {agent.captionsEnabled && agent.latestCaption && agent.isConnected && (
+            <p className="immersive-caption" data-role={agent.latestCaption.role}>
+              {agent.latestCaption.text}
+            </p>
+          )}
           <div className="voice-copy">
             <h2>{t.title}</h2>
             <p>{t.description}</p>

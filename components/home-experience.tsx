@@ -1,36 +1,33 @@
 "use client";
 
-import { ConversationProvider } from "@elevenlabs/react";
 import { useState } from "react";
 import { ContentSections } from "@/components/sections/content-sections";
+import { CallDock } from "@/components/voice/call-dock";
 import { VoiceHero } from "@/components/voice/voice-hero";
+import { VoiceRuntimeProvider } from "@/lib/elevenlabs/voice-runtime";
+import { useVoiceAgent } from "@/lib/elevenlabs/use-voice-agent";
 import type { Locale } from "@/lib/i18n/content";
+
+function VoiceExperience({ locale, onLocaleChange }: { locale: Locale; onLocaleChange: (locale: Locale) => void }) {
+  const agent = useVoiceAgent(locale);
+
+  return (
+    <>
+      <main>
+        <VoiceHero locale={locale} onLocaleChange={onLocaleChange} agent={agent} />
+        <ContentSections locale={locale} />
+      </main>
+      <CallDock locale={locale} agent={agent} />
+    </>
+  );
+}
 
 export function HomeExperience() {
   const [locale, setLocale] = useState<Locale>("zh");
 
   return (
-    <ConversationProvider
-      onError={(message, context) => {
-        if (process.env.NODE_ENV === "development") {
-          console.error("[VoiceAgent] SDK error", message, context);
-        }
-      }}
-      onDisconnect={(details) => {
-        if (process.env.NODE_ENV === "development") {
-          console.debug("[VoiceAgent] disconnected", details);
-        }
-      }}
-      onInterruption={(event) => {
-        if (process.env.NODE_ENV === "development") {
-          console.debug("[VoiceAgent] interruption", event);
-        }
-      }}
-    >
-      <main>
-        <VoiceHero locale={locale} onLocaleChange={setLocale} />
-        <ContentSections locale={locale} />
-      </main>
-    </ConversationProvider>
+    <VoiceRuntimeProvider>
+      <VoiceExperience locale={locale} onLocaleChange={setLocale} />
+    </VoiceRuntimeProvider>
   );
 }

@@ -18,7 +18,9 @@ export const copy = {
       idle: "尚未开始",
       connecting: "正在连接",
       listening: "正在听",
+      thinking: "正在思考",
       speaking: "正在回答",
+      muted: "麦克风已关闭",
       error: "连接遇到问题",
     },
     starters: [
@@ -28,7 +30,7 @@ export const copy = {
       "你怎么看 Voice Agent？",
       "除了工作你喜欢什么？",
     ],
-    nav: { product: "产品", research: "研究", interests: "兴趣", projects: "项目", about: "关于" },
+    nav: { product: "产品", technical: "技术", research: "研究", interests: "兴趣", projects: "项目", about: "关于" },
   },
   en: {
     name: "Zhenli Chen",
@@ -47,7 +49,9 @@ export const copy = {
       idle: "Not started",
       connecting: "Connecting",
       listening: "Listening",
+      thinking: "Thinking",
       speaking: "Speaking",
+      muted: "Microphone muted",
       error: "Connection problem",
     },
     starters: [
@@ -57,6 +61,6 @@ export const copy = {
       "What makes a good Voice Agent?",
       "What are you interested in outside work?",
     ],
-    nav: { product: "Product", research: "Research", interests: "Interests", projects: "Projects", about: "About" },
+    nav: { product: "Product", technical: "Technology", research: "Research", interests: "Interests", projects: "Projects", about: "About" },
   },
 } as const;

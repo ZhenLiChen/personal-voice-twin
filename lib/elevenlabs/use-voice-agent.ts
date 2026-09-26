@@ -3,14 +3,16 @@
 import {
   useConversationClientTool,
   useConversationControls,
+  useConversationInput,
   useConversationMode,
   useConversationStatus,
 } from "@elevenlabs/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Locale } from "@/lib/i18n/content";
-import { openSection } from "@/lib/elevenlabs/open-section";
+import { useVoiceRuntime } from "@/lib/elevenlabs/voice-runtime";
+import { actionFromClientTool, executeUiAction } from "@/lib/ui-actions/execute";
 
-export type VoiceUiState = "idle" | "connecting" | "listening" | "speaking" | "error";
+export type VoiceUiState = "idle" | "connecting" | "listening" | "thinking" | "speaking" | "muted" | "error";
 export type SessionKind = "voice" | "text" | null;
 
 function microphoneErrorMessage(error: unknown, locale: Locale) {
@@ -38,14 +40,63 @@ function microphoneErrorMessage(error: unknown, locale: Locale) {
 export function useVoiceAgent(locale: Locale) {
   const { status, message: sdkMessage } = useConversationStatus();
   const { isSpeaking, isListening } = useConversationMode();
-  const { startSession, endSession, sendUserMessage } = useConversationControls();
+  const { isMuted, setMuted } = useConversationInput();
+  const { startSession, endSession, sendUserMessage, setVolume } = useConversationControls();
+  const runtime = useVoiceRuntime();
   const [localError, setLocalError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [sessionKind, setSessionKind] = useState<SessionKind>(null);
+  const [isSpeakerMuted, setSpeakerMuted] = useState(false);
+  const [captionsEnabled, setCaptionsEnabled] = useState(true);
+  const [transcriptExpanded, setTranscriptExpanded] = useState(false);
+  const [ignoreSdkErrors, setIgnoreSdkErrors] = useState(false);
   const pendingMessage = useRef<string | null>(null);
 
   useConversationClientTool("open_section", (parameters: Record<string, unknown>) => {
-    const result = openSection(parameters.section);
+    const result = executeUiAction({ version: "1.0", type: "OPEN_SECTION", target: parameters.section });
+    runtime.recordAction(result);
+    return JSON.stringify(result);
+  });
+
+  useConversationClientTool("open_note", (parameters: Record<string, unknown>) => {
+    const result = executeUiAction(actionFromClientTool("OPEN_NOTE", parameters));
+    runtime.recordAction(result);
+    return JSON.stringify(result);
+  });
+
+  useConversationClientTool("open_project", (parameters: Record<string, unknown>) => {
+    const result = executeUiAction(actionFromClientTool("OPEN_PROJECT", parameters));
+    runtime.recordAction(result);
+    return JSON.stringify(result);
+  });
+
+  useConversationClientTool("show_metric", (parameters: Record<string, unknown>) => {
+    const result = executeUiAction(actionFromClientTool("SHOW_METRIC", parameters));
+    runtime.recordAction(result);
+    return JSON.stringify(result);
+  });
+
+  useConversationClientTool("show_research_figure", (parameters: Record<string, unknown>) => {
+    const result = executeUiAction(actionFromClientTool("SHOW_RESEARCH_FIGURE", parameters));
+    runtime.recordAction(result);
+    return JSON.stringify(result);
+  });
+
+  useConversationClientTool("highlight_source", (parameters: Record<string, unknown>) => {
+    const result = executeUiAction(actionFromClientTool("HIGHLIGHT_SOURCE", parameters));
+    runtime.recordAction(result);
+    return JSON.stringify(result);
+  });
+
+  useConversationClientTool("show_timeline", (parameters: Record<string, unknown>) => {
+    const result = executeUiAction(actionFromClientTool("SHOW_TIMELINE", parameters));
+    runtime.recordAction(result);
+    return JSON.stringify(result);
+  });
+
+  useConversationClientTool("show_map", (parameters: Record<string, unknown>) => {
+    const result = executeUiAction(actionFromClientTool("SHOW_MAP", parameters));
+    runtime.recordAction(result);
     return JSON.stringify(result);
   });
 
@@ -66,7 +117,7 @@ export function useVoiceAgent(locale: Locale) {
       }
     }, 0);
     return () => window.clearTimeout(sendPendingMessage);
-  }, [locale, sendUserMessage, status]);
+  }, [locale, runtime, sendUserMessage, status]);
 
   const getBaseOptions = useCallback(
     // Intentionally omit TTS, voice, language, and first-message overrides.
@@ -86,8 +137,10 @@ export function useVoiceAgent(locale: Locale) {
   }, [agentId, locale]);
 
   const startConversation = useCallback(async () => {
+    setIgnoreSdkErrors(false);
     setLocalError(null);
     setNotice(null);
+    setSpeakerMuted(false);
     if (!ensureConfigured()) return;
     if (!navigator.mediaDevices?.getUserMedia) {
       setLocalError(microphoneErrorMessage(new DOMException("unsupported", "unsupported"), locale));
@@ -107,6 +160,7 @@ export function useVoiceAgent(locale: Locale) {
   }, [ensureConfigured, getBaseOptions, locale, startSession]);
 
   const endConversation = useCallback(() => {
+    setIgnoreSdkErrors(true);
     endSession();
     pendingMessage.current = null;
     setSessionKind(null);
@@ -123,6 +177,7 @@ export function useVoiceAgent(locale: Locale) {
       if (isConnected) {
         try {
           sendUserMessage(value);
+          runtime.recordUserMessage(value);
           setNotice(null);
           return true;
         } catch (error) {
@@ -133,24 +188,38 @@ export function useVoiceAgent(locale: Locale) {
       }
 
       if (!ensureConfigured()) return false;
+      setIgnoreSdkErrors(false);
       pendingMessage.current = value;
+      runtime.recordUserMessage(value);
       setSessionKind("text");
       setNotice(locale === "zh" ? "正在建立文字会话，连接后会自动发送。" : "Starting a text session; your message will send when connected.");
       startSession({ ...getBaseOptions(), textOnly: true, connectionType: "websocket" });
       return true;
     },
-    [ensureConfigured, getBaseOptions, isConnected, locale, sendUserMessage, startSession],
+    [ensureConfigured, getBaseOptions, isConnected, locale, runtime, sendUserMessage, startSession],
   );
 
-  const error = localError ?? (status === "error" ? sdkMessage ?? (locale === "zh" ? "Agent 连接失败。" : "Agent connection failed.") : null);
+  const toggleSpeaker = useCallback(() => {
+    const nextMuted = !isSpeakerMuted;
+    setSpeakerMuted(nextMuted);
+    setVolume({ volume: nextMuted ? 0 : 1 });
+  }, [isSpeakerMuted, setVolume]);
+
+  const error = localError ?? (status === "error" && !ignoreSdkErrors
+    ? sdkMessage ?? (locale === "zh" ? "Agent 连接失败。" : "Agent connection failed.")
+    : null);
   const uiState: VoiceUiState = error
     ? "error"
     : status === "connecting"
       ? "connecting"
       : status !== "connected"
         ? "idle"
+        : isMuted && sessionKind === "voice"
+          ? "muted"
         : isSpeaking
           ? "speaking"
+          : runtime.isAwaitingAgent
+            ? "thinking"
           : "listening";
 
   return {
@@ -159,6 +228,17 @@ export function useVoiceAgent(locale: Locale) {
     isConnected,
     isSpeaking,
     isListening: isConnected && isListening,
+    isMuted,
+    setMuted,
+    isSpeakerMuted,
+    toggleSpeaker,
+    captionsEnabled,
+    setCaptionsEnabled,
+    transcriptExpanded,
+    setTranscriptExpanded,
+    transcript: runtime.transcript,
+    latestCaption: runtime.latestCaption,
+    hasAudioAlignment: runtime.hasAudioAlignment,
     sessionKind,
     startConversation,
     endConversation,
@@ -167,3 +247,5 @@ export function useVoiceAgent(locale: Locale) {
     notice,
   };
 }
+
+export type VoiceAgentController = ReturnType<typeof useVoiceAgent>;

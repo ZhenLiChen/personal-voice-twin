@@ -2,7 +2,7 @@
 
 一个中文优先、支持英文切换的 conversational personal interface。Voice Agent 是主要交互入口，网站是工作、研究、项目与兴趣的视觉知识层。
 
-当前版本是 Foundation + Voice Vertical Slice：自定义 Voice Hero 使用 ElevenLabs React SDK 连接真实 Agent，并支持麦克风会话、Agent 语音、真实 listening/speaking 状态、文字会话和 `open_section` 页面动作。
+当前版本是 Foundation + Voice Vertical Slice：自定义 Voice Hero 使用 ElevenLabs React SDK 连接真实 Agent，并支持麦克风会话、Agent 语音、持久通话控制、实时/完整双层字幕、文字会话和受控页面动作。
 
 ## Local Setup
 
@@ -83,7 +83,7 @@ NEXT_PUBLIC_ELEVENLABS_AGENT_ID=
 - Parameter：`section`
 - Type：String
 - Required：Yes
-- Allowed values：`about`, `product`, `research`, `interests`, `projects`
+- Allowed values：`about`, `product`, `technical`, `research`, `interests`, `projects`
 - 建议打开 **Wait for response**，让 Agent 收到成功或失败结果。
 
 前端会验证参数、查找稳定 section ID、执行 smooth scroll 并返回 JSON result。开发模式会输出：
@@ -101,7 +101,23 @@ NEXT_PUBLIC_ELEVENLABS_AGENT_ID=
 - Turn eagerness 首先使用 Normal，再用中文停顿、`嗯……`、自我修正等 badcase 调整。
 - 不要用 System Prompt 修复抢话或不接话；这些属于 Conversation Flow。
 
-### 7. 浏览器与安全要求
+### 7. Client Events（实时字幕必须检查）
+
+在 Agent 的 **Advanced → Client events** 中确认启用：
+
+- `user_transcript`：用户 ASR final；
+- `tentative_user_transcript`：用户 ASR partial；
+- `agent_response`：Agent final answer；
+- `agent_chat_response_part`：Agent streaming text。文字会话默认发送，**语音会话必须显式启用**；
+- `agent_response_correction`：用户打断后，用截断后的文本修正记录；
+- `interruption`：前端观察打断事件；
+- `client_tool_call`：Client Tool 调用。
+
+Dashboard 版本若没有单独的 Advanced 标签，请在 Agent 设置中搜索 **Client events**；底层字段是 `conversation_config.conversation.client_events`。保存后重新发布 Agent，并新建会话测试，旧会话不会热更新配置。
+
+`onAudioAlignment` 已接入，用于探测字符级音频对齐事件；当前 WebRTC 音频由 LiveKit 直接播放，不能假设每次都会收到 alignment，因此字幕文本不依赖它才能工作。
+
+### 8. 浏览器与安全要求
 
 - 首次点击“开始对话”后浏览器才请求麦克风权限。
 - 允许 localhost 的麦克风权限；部署后必须使用 HTTPS。
@@ -110,10 +126,43 @@ NEXT_PUBLIC_ELEVENLABS_AGENT_ID=
 ## Current Conversation Architecture
 
 - `ConversationProvider`：官方 SDK 生命周期与回调边界。
-- `useVoiceAgent()`：统一暴露连接状态、真实 speaking/listening、start/end、文字发送和用户可见错误。
+- `VoiceRuntimeProvider`：处理 final message、ASR partial、Agent streaming text、打断修正、alignment 探测和 transcript 去重。
+- `useVoiceAgent()`：统一暴露连接状态、麦克风/扬声器/字幕控制、start/end、文字发送和用户可见错误。
 - Voice CTA：请求麦克风后用 public Agent ID 建立 WebRTC session。
 - Text fallback：已连接时调用同一 session 的 `sendUserMessage`；未连接时创建同一 Agent 的 text-only WebSocket session，连接后自动发送待处理消息。
-- UI 不伪造 thinking。当前 Orb 只映射 SDK 可可靠提供的 idle、connecting、listening、speaking 和 error。
+- 通话 Dock：进入 session 后持续可见。闭麦使用 SDK `setMuted`，保持 session；扬声器使用 `setVolume`，不会调用 Agent tool。
+- `listening` / `speaking` 来自 SDK mode；`thinking` 是收到用户 final 后到 Agent 首个 streaming/final event 之间的派生状态；`muted` 来自 SDK input state。
+- 当前 Voice 完全继承 ElevenLabs Dashboard 的 Agent 配置，代码不传 `tts.voiceId` 或 voice override。音色入口只展示这一边界，不允许 Agent 自动切换。
+
+## Transcript Event Sources
+
+| 记录类型 | 来源 | 行为 |
+| --- | --- | --- |
+| User ASR partial | `onIncomingEvent` 中的 `tentative_user_transcript` | 同一活动 turn 覆盖更新，不重复追加 |
+| User ASR final | `onMessage` / 文字发送 | 覆盖 partial 并固化 |
+| Agent streaming | `onAgentChatResponsePart` | `start/delta/stop` 聚合为同一 turn |
+| Agent final | `onMessage` | 用 final answer 固化 streaming turn |
+| Interrupted correction | `onAgentResponseCorrection` | 用服务端修正文本替换被打断的回答 |
+| UI action / error | 前端执行器 / SDK error callback | 作为 system event 进入记录层 |
+
+沉浸字幕只显示最近一至两行；完整记录需要用户主动展开，不呈现聊天气泡瀑布。
+
+## Controlled UI Actions
+
+浏览器动作全部使用 ElevenLabs **Client Tool**。前端仅接受版本 `1.0`、已知 action、该 action 对应的 target 白名单，以及可选 focus 白名单；任意 URL、DOM selector、未知属性或未知 target 都会被拒绝并记录原因。
+
+| Client Tool | Action | 当前执行状态 |
+| --- | --- | --- |
+| `open_section` | `OPEN_SECTION` | 真实滚动：`about/product/technical/research/interests/projects` |
+| `open_note` | `OPEN_NOTE` | 真实滚动到对应知识区域（首版） |
+| `open_project` | `OPEN_PROJECT` | 真实滚动并短暂强调白名单项目 |
+| `show_metric` | `SHOW_METRIC` | 安全 mock：只记录，不伪造指标 |
+| `show_research_figure` | `SHOW_RESEARCH_FIGURE` | 安全 mock：等待审核后图表 |
+| `highlight_source` | `HIGHLIGHT_SOURCE` | 安全 mock：等待公开来源组件 |
+| `show_timeline` | `SHOW_TIMELINE` | 安全 mock：等待 timeline 组件 |
+| `show_map` | `SHOW_MAP` | 安全 mock：等待 map 组件 |
+
+只有在 Dashboard 创建且名称与前端完全一致的 Client Tool，Agent 才能主动调用它。每个工具建议使用一个必填 String 参数 `target`（`open_section` 为兼容现有配置继续使用 `section`），把该行对应白名单填入 Enum values，并启用 response；前端会把 `{ ok, action, target, status, reason? }` 的安全结果返回 Agent。
 
 ## Troubleshooting
 

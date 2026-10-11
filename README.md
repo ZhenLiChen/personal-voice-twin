@@ -61,7 +61,7 @@ NEXT_PUBLIC_ELEVENLABS_AGENT_ID=
 
 > 你好，我是 Zhenli 的 AI 分身。你可以问我她做过的 AI 语音项目、语言学研究，或者最近在关注什么。
 
-英文 language override 使用：
+在 Dashboard 的英文语言配置中设置对应开场白：
 
 > Hi, I'm Zhenli's AI counterpart. You can ask me about her work in voice AI, her linguistics research, or what she's currently exploring.
 
@@ -69,7 +69,8 @@ NEXT_PUBLIC_ELEVENLABS_AGENT_ID=
 
 ### 4. Language 与 Voice
 
-- 将中文配置为主要支持语言，并添加 English。
+- 将中文（`zh`）配置为默认语言，并在 Additional Languages 添加 English（`en`）。
+- 在 Agent 的 Tools 中添加系统工具 Detect language / Language detection；它不会默认启用。若需要整场对话都能切换语言，不要开启 Only at start of conversation。
 - 选择能自然处理中英文和英文缩写的 Voice。
 - 分别测试普通话、中英混合、`ASR`、`TTS`、`RAG`、`ElevenLabs` 等表达。
 - 页面语言切换当前负责 UI 文案。Agent 回复语言依赖 Dashboard 多语言配置和用户实际输入；当前 Agent 禁止 client language override。
@@ -119,7 +120,7 @@ Dashboard 版本若没有单独的 Advanced 标签，请在 Agent 设置中搜�
 
 ### 8. 浏览器与安全要求
 
-- 首次点击“开始对话”后浏览器才请求麦克风权限。
+- 首次点击“开始对话”后浏览器才请求麦克风权限，同时显示等待提示；等待超过 30 秒会提示检查权限。等待期间可以取消，迟到的授权不会重新开启已取消的会话。
 - 允许 localhost 的麦克风权限；部署后必须使用 HTTPS。
 - 若权限被拒绝或设备不可用，页面会显示错误，并仍允许启动 text-only session。
 
@@ -145,7 +146,7 @@ Dashboard 版本若没有单独的 Advanced 标签，请在 Agent 设置中搜�
 | Interrupted correction | `onAgentResponseCorrection` | 用服务端修正文本替换被打断的回答 |
 | UI action / error | 前端执行器 / SDK error callback | 作为 system event 进入记录层 |
 
-沉浸字幕只显示最近一至两行；完整记录需要用户主动展开，不呈现聊天气泡瀑布。
+当前字幕保留完整文本，长回复可以在字幕区域滚动阅读。流式追加时跟随最新内容，用户向上翻看时暂停跟随。底部字幕提供“完整记录”入口；展开记录后隐藏重复的底部字幕。
 
 ## Controlled UI Actions
 
@@ -172,7 +173,7 @@ Dashboard 版本若没有单独的 Advanced 标签，请在 Agent 设置中搜�
 - **有连接但没有声音**：检查 Dashboard Voice、系统输出设备、浏览器自动播放策略和音量。
 - **`open_section` 不调用**：确认 Dashboard 工具类型、名称、参数名与 allowed values 完全一致，并确认 System Prompt 允许在合适情境调用。
 - **工具调用了但页面不滚动**：开发环境用右下角 debug 面板验证 DOM action，再检查 console 的 `[VoiceAgentTool]` 日志。
-- **语言不跟随切换**：确认 Dashboard 开启中文/英文及 client language/first-message overrides；结束旧 session 后重新开始。
+- **语言不跟随切换**：确认 Dashboard 默认语言为中文、已添加英文，并启用 Language detection 系统工具；保存配置后结束旧 session 并重新开始。当前页面中 / EN 按钮只切换 UI，代码不发送语言 override。
 
 ## Privacy Boundary
 

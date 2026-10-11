@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import type { VoiceAgentController } from "@/lib/elevenlabs/use-voice-agent";
 import type { Locale } from "@/lib/i18n/content";
 import type { TranscriptEntry } from "@/lib/elevenlabs/voice-runtime";
+import { CaptionText } from "./caption-text";
 
 type CallDockProps = {
   locale: Locale;
@@ -91,10 +92,13 @@ export function CallDock({ locale, agent }: CallDockProps) {
     <aside className="call-layer" aria-label={locale === "zh" ? "通话控制" : "Call controls"}>
       {agent.transcriptExpanded && <TranscriptRecord entries={agent.transcript} locale={locale} />}
 
-      {agent.captionsEnabled && agent.latestCaption && (
+      {agent.captionsEnabled && agent.latestCaption && !agent.transcriptExpanded && (
         <div className="dock-caption" data-role={agent.latestCaption.role} aria-live="polite">
           <span>{agent.latestCaption.role === "user" ? (locale === "zh" ? "你" : "You") : "Zhenli AI"}</span>
-          <p>{agent.latestCaption.text}</p>
+          <CaptionText entry={agent.latestCaption} className="dock-caption-text" label={locale === "zh" ? "当前字幕，可滚动阅读" : "Current caption, scroll to read"} />
+          <button className="caption-record-link" type="button" onClick={() => agent.setTranscriptExpanded(true)}>
+            {locale === "zh" ? "完整记录 ↗" : "Full transcript ↗"}
+          </button>
         </div>
       )}
 

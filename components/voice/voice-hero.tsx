@@ -5,6 +5,7 @@ import { copy, type Locale } from "@/lib/i18n/content";
 import { openSection, sectionIds } from "@/lib/elevenlabs/open-section";
 import type { VoiceAgentController } from "@/lib/elevenlabs/use-voice-agent";
 import { VoiceOrb } from "./voice-orb";
+import { CaptionText } from "./caption-text";
 
 type VoiceHeroProps = {
   locale: Locale;
@@ -56,9 +57,7 @@ export function VoiceHero({ locale, onLocaleChange, agent }: VoiceHeroProps) {
         <div className="voice-console">
           <VoiceOrb state={agent.uiState} label={t.statuses[agent.uiState]} />
           {agent.captionsEnabled && agent.latestCaption && agent.isConnected && (
-            <p className="immersive-caption" data-role={agent.latestCaption.role}>
-              {agent.latestCaption.text}
-            </p>
+            <CaptionText entry={agent.latestCaption} className="immersive-caption" label={locale === "zh" ? "当前字幕，可滚动阅读" : "Current caption, scroll to read"} />
           )}
           <div className="voice-copy">
             <h2>{t.title}</h2>

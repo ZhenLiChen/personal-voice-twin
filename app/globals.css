@@ -71,7 +71,7 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid 
 .status-dot[data-state="muted"] { background: #777168; }
 .status-dot[data-state="error"] { background: var(--error); }
 .voice-copy { margin: 2rem auto 0; max-width: 520px; }
-.immersive-caption { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; min-height: 2.8em; max-width: 560px; margin: 2rem auto -1rem; color: var(--ink); font-family: var(--font-editorial); font-size: clamp(1rem, 1.5vw, 1.25rem); line-height: 1.4; }
+.immersive-caption { overflow-y: auto; overscroll-behavior: contain; white-space: pre-wrap; overflow-wrap: anywhere; max-height: min(32dvh, 16rem); min-height: 2.8em; max-width: 560px; margin: 2rem auto -1rem; color: var(--ink); font-family: var(--font-editorial); font-size: clamp(1rem, 1.5vw, 1.25rem); line-height: 1.4; }
 .immersive-caption[data-role="user"] { color: var(--muted); }
 .voice-copy h2 { margin: 0; font-family: var(--font-editorial); font-size: clamp(1.85rem, 3vw, 2.8rem); font-weight: 400; letter-spacing: -.035em; }
 .voice-copy p { color: var(--muted); margin: .85rem auto 0; font-size: .88rem; line-height: 1.7; }
@@ -152,14 +152,16 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid 
 .dock-caption { max-width: 580px; min-width: min(420px, calc(100vw - 2.5rem)); padding: .78rem 1rem; border: 1px solid var(--line); border-radius: 14px; background: rgba(25,23,19,.88); box-shadow: 0 10px 34px rgba(0,0,0,.2); backdrop-filter: blur(18px); }
 .dock-caption > span { color: var(--signal); font-family: var(--font-display); font-size: .52rem; letter-spacing: .1em; text-transform: uppercase; }
 .dock-caption[data-role="user"] > span { color: var(--live); }
-.dock-caption p { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; margin: .35rem 0 0; font-size: .78rem; line-height: 1.45; }
+.dock-caption-text { overflow-y: auto; overscroll-behavior: contain; white-space: pre-wrap; overflow-wrap: anywhere; max-height: min(30dvh, 14rem); margin: .5rem 0 0; padding-right: .4rem; font-size: .9rem; line-height: 1.65; }
+.caption-record-link { display: block; margin: .65rem 0 0 auto; border: 0; background: transparent; color: var(--signal); font-size: .7rem; cursor: pointer; }
+.immersive-caption:focus-visible, .dock-caption-text:focus-visible { outline: 1px solid var(--signal); outline-offset: 3px; }
 .transcript-record { width: min(620px, calc(100vw - 2.5rem)); max-height: min(62vh, 620px); display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; border: 1px solid rgba(240,235,225,.16); border-radius: 18px; background: rgba(24,22,18,.96); box-shadow: 0 22px 80px rgba(0,0,0,.5); backdrop-filter: blur(24px); }
 .transcript-record > header { display: flex; justify-content: space-between; padding: .9rem 1rem; border-bottom: 1px solid var(--line); color: #777168; font-family: var(--font-display); font-size: .52rem; letter-spacing: .12em; }
 .transcript-record > header p { margin: 0; }
 .transcript-scroll { overflow-y: auto; overscroll-behavior: contain; padding: .3rem 1rem 1rem; }
 .transcript-scroll article { position: relative; padding: 1rem 0; border-bottom: 1px solid var(--line); }
 .transcript-scroll article > div { display: flex; justify-content: space-between; gap: 1rem; color: #777168; font-size: .55rem; letter-spacing: .08em; text-transform: uppercase; }
-.transcript-scroll article > p { margin: .5rem 0 0; color: var(--ink); font-size: .78rem; line-height: 1.65; white-space: pre-wrap; }
+.transcript-scroll article > p { margin: .5rem 0 0; color: var(--ink); font-size: .78rem; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
 .transcript-scroll article[data-kind="user_partial"] > p, .transcript-scroll article[data-kind="agent_streaming"] > p { color: var(--muted); }
 .transcript-scroll article[data-kind="tool"] > p { color: var(--signal); font-family: var(--font-display); font-size: .66rem; }
 .transcript-scroll article[data-kind="error"] > p { color: var(--error); }

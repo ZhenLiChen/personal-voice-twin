@@ -50,7 +50,12 @@ export function useVoiceAgent(locale: Locale) {
   const [captionsEnabled, setCaptionsEnabled] = useState(true);
   const [transcriptExpanded, setTranscriptExpanded] = useState(false);
   const [ignoreSdkErrors, setIgnoreSdkErrors] = useState(false);
+  const [requestingMicrophone, setRequestingMicrophone] = useState(false);
+  const microphoneAttempt = useRef(0);
+  const microphonePending = useRef(false);
   const pendingMessage = useRef<string | null>(null);
+
+  useEffect(() => () => { microphoneAttempt.current += 1; }, []);
 
   useConversationClientTool("open_section", (parameters: Record<string, unknown>) => {
     const result = executeUiAction({ version: "1.0", type: "OPEN_SECTION", target: parameters.section });
@@ -137,6 +142,7 @@ export function useVoiceAgent(locale: Locale) {
   }, [agentId, locale]);
 
   const startConversation = useCallback(async () => {
+    if (microphonePending.current || status === "connecting" || status === "connected") return;
     setIgnoreSdkErrors(false);
     setLocalError(null);
     setNotice(null);
@@ -147,19 +153,48 @@ export function useVoiceAgent(locale: Locale) {
       return;
     }
 
+    const attempt = ++microphoneAttempt.current;
+    microphonePending.current = true;
+    setRequestingMicrophone(true);
+    setNotice(locale === "zh"
+      ? "正在请求麦克风，请在浏览器的权限提示中选择允许。"
+      : "Requesting microphone access. Please allow it in your browser's permission prompt.");
+    const timeout = window.setTimeout(() => {
+      if (attempt !== microphoneAttempt.current) return;
+      microphoneAttempt.current += 1;
+      microphonePending.current = false;
+      setRequestingMicrophone(false);
+      setNotice(null);
+      setLocalError(locale === "zh"
+        ? "等待麦克风授权超时。请检查浏览器和系统的麦克风权限，再重试；也可以使用文字模式。"
+        : "Microphone permission timed out. Check browser and system permissions, then retry or use text mode.");
+    }, 30000);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.getTracks().forEach((track) => track.stop());
+      if (attempt !== microphoneAttempt.current) return;
+      setNotice(null);
       setSessionKind("voice");
       startSession({ ...getBaseOptions(), connectionType: "webrtc" });
     } catch (error) {
+      if (attempt !== microphoneAttempt.current) return;
+      setNotice(null);
       setSessionKind(null);
       setLocalError(microphoneErrorMessage(error, locale));
       if (process.env.NODE_ENV === "development") console.error("[VoiceAgent] microphone failed", error);
+    } finally {
+      window.clearTimeout(timeout);
+      if (attempt === microphoneAttempt.current) {
+        microphonePending.current = false;
+        setRequestingMicrophone(false);
+      }
     }
-  }, [ensureConfigured, getBaseOptions, locale, startSession]);
+  }, [ensureConfigured, getBaseOptions, locale, startSession, status]);
 
   const endConversation = useCallback(() => {
+    microphoneAttempt.current += 1;
+    microphonePending.current = false;
+    setRequestingMicrophone(false);
     setIgnoreSdkErrors(true);
     endSession();
     pendingMessage.current = null;
@@ -170,6 +205,7 @@ export function useVoiceAgent(locale: Locale) {
 
   const sendTextMessage = useCallback(
     (text: string) => {
+      if (microphonePending.current || status === "connecting") return false;
       const value = text.trim();
       if (!value) return false;
       setLocalError(null);
@@ -196,7 +232,7 @@ export function useVoiceAgent(locale: Locale) {
       startSession({ ...getBaseOptions(), textOnly: true, connectionType: "websocket" });
       return true;
     },
-    [ensureConfigured, getBaseOptions, isConnected, locale, runtime, sendUserMessage, startSession],
+    [ensureConfigured, getBaseOptions, isConnected, locale, runtime, sendUserMessage, startSession, status],
   );
 
   const toggleSpeaker = useCallback(() => {
@@ -205,12 +241,12 @@ export function useVoiceAgent(locale: Locale) {
     setVolume({ volume: nextMuted ? 0 : 1 });
   }, [isSpeakerMuted, setVolume]);
 
-  const error = localError ?? (status === "error" && !ignoreSdkErrors
+  const error = localError ?? (status === "error" && !ignoreSdkErrors && !requestingMicrophone
     ? sdkMessage ?? (locale === "zh" ? "Agent 连接失败。" : "Agent connection failed.")
     : null);
   const uiState: VoiceUiState = error
     ? "error"
-    : status === "connecting"
+    : requestingMicrophone || status === "connecting"
       ? "connecting"
       : status !== "connected"
         ? "idle"
@@ -223,7 +259,7 @@ export function useVoiceAgent(locale: Locale) {
           : "listening";
 
   return {
-    status,
+    status: requestingMicrophone ? "connecting" as const : status,
     uiState,
     isConnected,
     isSpeaking,
